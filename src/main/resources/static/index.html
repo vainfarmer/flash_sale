@@ -1,0 +1,822 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>秒杀系统</title>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #ff4757;
+            --primary-dark: #ee5a24;
+            --secondary: #2f3542;
+            --accent: #ffa502;
+            --success: #2ed573;
+            --danger: #ff4757;
+            --bg-dark: #1a1a2e;
+            --bg-card: #16213e;
+            --text-primary: #ffffff;
+            --text-secondary: #a4b0be;
+            --gradient-primary: linear-gradient(135deg, #ff4757 0%, #ff6b81 100%);
+            --gradient-gold: linear-gradient(135deg, #ffa502 0%, #ff7f50 100%);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Noto Sans SC', sans-serif;
+            background: var(--bg-dark);
+            color: var(--text-primary);
+            min-height: 100vh;
+            background-image: 
+                radial-gradient(ellipse at top left, rgba(255, 71, 87, 0.1) 0%, transparent 50%),
+                radial-gradient(ellipse at bottom right, rgba(255, 165, 2, 0.1) 0%, transparent 50%);
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        /* Header */
+        .header {
+            text-align: center;
+            padding: 40px 0;
+            position: relative;
+        }
+
+        .header h1 {
+            font-size: 3rem;
+            font-weight: 700;
+            background: var(--gradient-primary);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            text-shadow: 0 0 30px rgba(255, 71, 87, 0.3);
+        }
+
+        .header p {
+            color: var(--text-secondary);
+            margin-top: 10px;
+            font-size: 1.1rem;
+        }
+
+        /* Login Panel */
+        .login-panel {
+            background: var(--bg-card);
+            border-radius: 16px;
+            padding: 30px;
+            max-width: 400px;
+            margin: 20px auto;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+        }
+
+        .login-panel h2 {
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 12px 16px;
+            border: 2px solid rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            background: rgba(255, 255, 255, 0.05);
+            color: var(--text-primary);
+            font-size: 1rem;
+            transition: all 0.3s ease;
+        }
+
+        .form-group input:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 20px rgba(255, 71, 87, 0.2);
+        }
+
+        /* Buttons */
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 14px 28px;
+            border: none;
+            border-radius: 10px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-decoration: none;
+        }
+
+        .btn-primary {
+            background: var(--gradient-primary);
+            color: white;
+            width: 100%;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 30px rgba(255, 71, 87, 0.4);
+        }
+
+        .btn-primary:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.1);
+            color: var(--text-primary);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .btn-secondary:hover {
+            background: rgba(255, 255, 255, 0.15);
+        }
+
+        .btn-flash {
+            background: var(--gradient-gold);
+            color: white;
+            font-size: 1.1rem;
+            padding: 16px 40px;
+        }
+
+        .btn-flash:hover:not(:disabled) {
+            transform: scale(1.05);
+            box-shadow: 0 10px 30px rgba(255, 165, 2, 0.4);
+        }
+
+        .btn-flash:disabled {
+            background: #666;
+            cursor: not-allowed;
+        }
+
+        /* User Info */
+        .user-info {
+            display: flex;
+            justify-content: flex-end;
+            align-items: center;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .user-info span {
+            color: var(--text-secondary);
+        }
+
+        .user-info strong {
+            color: var(--accent);
+        }
+
+        /* Product Grid */
+        .products-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+            gap: 30px;
+            margin-top: 30px;
+        }
+
+        .product-card {
+            background: var(--bg-card);
+            border-radius: 20px;
+            overflow: hidden;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            transition: all 0.3s ease;
+            position: relative;
+        }
+
+        .product-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.3);
+            border-color: var(--primary);
+        }
+
+        .product-badge {
+            position: absolute;
+            top: 15px;
+            left: 15px;
+            padding: 6px 16px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            z-index: 1;
+        }
+
+        .badge-running {
+            background: var(--success);
+            color: white;
+        }
+
+        .badge-waiting {
+            background: var(--accent);
+            color: white;
+        }
+
+        .badge-ended {
+            background: #666;
+            color: white;
+        }
+
+        .product-image {
+            width: 100%;
+            height: 200px;
+            object-fit: cover;
+            background: linear-gradient(135deg, #2f3542 0%, #1a1a2e 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 4rem;
+        }
+
+        .product-content {
+            padding: 25px;
+        }
+
+        .product-name {
+            font-size: 1.4rem;
+            font-weight: 700;
+            margin-bottom: 10px;
+        }
+
+        .product-desc {
+            color: var(--text-secondary);
+            font-size: 0.95rem;
+            margin-bottom: 15px;
+            line-height: 1.5;
+        }
+
+        .product-prices {
+            display: flex;
+            align-items: baseline;
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+
+        .flash-price {
+            font-size: 2rem;
+            font-weight: 700;
+            color: var(--primary);
+        }
+
+        .original-price {
+            font-size: 1.1rem;
+            color: var(--text-secondary);
+            text-decoration: line-through;
+        }
+
+        .product-info {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 20px;
+            padding: 15px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 12px;
+        }
+
+        .info-item {
+            text-align: center;
+        }
+
+        .info-label {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+            margin-bottom: 5px;
+        }
+
+        .info-value {
+            font-size: 1.1rem;
+            font-weight: 600;
+        }
+
+        .stock-low {
+            color: var(--danger);
+        }
+
+        .countdown {
+            text-align: center;
+            padding: 15px;
+            background: rgba(255, 71, 87, 0.1);
+            border-radius: 12px;
+            margin-bottom: 20px;
+        }
+
+        .countdown-label {
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+            margin-bottom: 8px;
+        }
+
+        .countdown-time {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--primary);
+            font-variant-numeric: tabular-nums;
+        }
+
+        /* Modal */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.8);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+
+        .modal-overlay.active {
+            display: flex;
+        }
+
+        .modal {
+            background: var(--bg-card);
+            border-radius: 20px;
+            padding: 40px;
+            max-width: 450px;
+            width: 90%;
+            text-align: center;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            animation: modalIn 0.3s ease;
+        }
+
+        @keyframes modalIn {
+            from {
+                opacity: 0;
+                transform: scale(0.9);
+            }
+            to {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+
+        .modal-icon {
+            font-size: 4rem;
+            margin-bottom: 20px;
+        }
+
+        .modal-icon.success {
+            color: var(--success);
+        }
+
+        .modal-icon.error {
+            color: var(--danger);
+        }
+
+        .modal h3 {
+            font-size: 1.5rem;
+            margin-bottom: 15px;
+        }
+
+        .modal p {
+            color: var(--text-secondary);
+            margin-bottom: 25px;
+            line-height: 1.6;
+        }
+
+        .order-no {
+            font-family: monospace;
+            font-size: 1.1rem;
+            color: var(--accent);
+            background: rgba(255, 165, 2, 0.1);
+            padding: 10px 20px;
+            border-radius: 8px;
+            margin: 15px 0;
+            display: inline-block;
+        }
+
+        /* Toast */
+        .toast {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 15px 25px;
+            border-radius: 10px;
+            background: var(--bg-card);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: var(--text-primary);
+            font-weight: 500;
+            z-index: 2000;
+            transform: translateX(120%);
+            transition: transform 0.3s ease;
+            max-width: 350px;
+        }
+
+        .toast.show {
+            transform: translateX(0);
+        }
+
+        .toast.error {
+            border-color: var(--danger);
+            background: rgba(255, 71, 87, 0.1);
+        }
+
+        .toast.success {
+            border-color: var(--success);
+            background: rgba(46, 213, 115, 0.1);
+        }
+
+        /* Loading */
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top-color: white;
+            animation: spin 1s ease-in-out infinite;
+            margin-right: 10px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .header h1 {
+                font-size: 2rem;
+            }
+
+            .products-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .user-info {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <h1>⚡ 限时秒杀</h1>
+            <p>惊喜优惠，限时抢购</p>
+        </header>
+
+        <!-- Login Panel -->
+        <div id="loginPanel" class="login-panel">
+            <h2>🔐 用户登录</h2>
+            <form id="loginForm">
+                <div class="form-group">
+                    <label for="username">用户名</label>
+                    <input type="text" id="username" name="username" placeholder="请输入用户名" required>
+                </div>
+                <div class="form-group">
+                    <label for="password">密码</label>
+                    <input type="password" id="password" name="password" placeholder="请输入密码" required>
+                </div>
+                <button type="submit" class="btn btn-primary">登录</button>
+            </form>
+        </div>
+
+        <!-- Main Content (Hidden until login) -->
+        <div id="mainContent" style="display: none;">
+            <div class="user-info">
+                <span>欢迎，<strong id="usernameBadge"></strong></span>
+                <button class="btn btn-secondary" onclick="logout()">退出登录</button>
+            </div>
+
+            <div id="productsGrid" class="products-grid">
+                <!-- Products will be loaded here -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Result Modal -->
+    <div id="resultModal" class="modal-overlay">
+        <div class="modal">
+            <div id="modalIcon" class="modal-icon"></div>
+            <h3 id="modalTitle"></h3>
+            <p id="modalMessage"></p>
+            <div id="orderNoContainer" style="display: none;">
+                <span>订单号：</span>
+                <span id="orderNo" class="order-no"></span>
+            </div>
+            <button class="btn btn-primary" onclick="closeModal()" style="margin-top: 20px;">确定</button>
+        </div>
+    </div>
+
+    <!-- Toast -->
+    <div id="toast" class="toast"></div>
+
+    <script>
+        // Global state
+        let token = localStorage.getItem('token');
+        let username = localStorage.getItem('username');
+        let countdownTimers = {};
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            if (token) {
+                showMainContent();
+                loadProducts();
+            }
+        });
+
+        // Login Form
+        document.getElementById('loginForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+
+            try {
+                const response = await fetch('/api/user/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password })
+                });
+
+                const data = await response.json();
+                if (data.code === 200) {
+                    token = data.data.token;
+                    localStorage.setItem('token', token);
+                    localStorage.setItem('username', data.data.username);
+                    showToast('登录成功！', 'success');
+                    showMainContent();
+                    loadProducts();
+                } else {
+                    showToast(data.message || '登录失败', 'error');
+                }
+            } catch (error) {
+                showToast('网络错误，请重试', 'error');
+            }
+        });
+
+        // Show main content
+        function showMainContent() {
+            document.getElementById('loginPanel').style.display = 'none';
+            document.getElementById('mainContent').style.display = 'block';
+            document.getElementById('usernameBadge').textContent = localStorage.getItem('username') || '用户';
+        }
+
+        // Logout
+        function logout() {
+            localStorage.removeItem('token');
+            localStorage.removeItem('username');
+            token = null;
+            location.reload();
+        }
+
+        // Load products
+        async function loadProducts() {
+            try {
+                const response = await fetch('/api/flash/products');
+                const data = await response.json();
+                if (data.code === 200) {
+                    renderProducts(data.data);
+                }
+            } catch (error) {
+                showToast('加载商品失败', 'error');
+            }
+        }
+
+        // Render products
+        function renderProducts(products) {
+            const grid = document.getElementById('productsGrid');
+            grid.innerHTML = products.map(product => {
+                const status = getActivityStatus(product);
+                return `
+                    <div class="product-card" id="product-${product.id}">
+                        <span class="product-badge ${status.badgeClass}">${status.text}</span>
+                        <div class="product-image">🛍️</div>
+                        <div class="product-content">
+                            <h3 class="product-name">${product.productName}</h3>
+                            <p class="product-desc">${product.description || '限时特惠，不容错过'}</p>
+                            <div class="product-prices">
+                                <span class="flash-price">¥${product.flashPrice}</span>
+                                <span class="original-price">¥${product.originalPrice}</span>
+                            </div>
+                            <div class="product-info">
+                                <div class="info-item">
+                                    <div class="info-label">剩余库存</div>
+                                    <div class="info-value ${product.availableStock < 10 ? 'stock-low' : ''}" id="stock-${product.id}">
+                                        ${product.availableStock}
+                                    </div>
+                                </div>
+                                <div class="info-item">
+                                    <div class="info-label">限购</div>
+                                    <div class="info-value">${product.limitPerUser}件/人</div>
+                                </div>
+                            </div>
+                            <div class="countdown" id="countdown-${product.id}">
+                                <div class="countdown-label">${status.countdownLabel}</div>
+                                <div class="countdown-time" id="timer-${product.id}">--:--:--</div>
+                            </div>
+                            <button class="btn btn-flash" 
+                                    id="btn-${product.id}"
+                                    onclick="doFlashSale(${product.id})"
+                                    ${status.disabled ? 'disabled' : ''}>
+                                ${status.buttonText}
+                            </button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            // Start countdowns
+            products.forEach(product => {
+                startCountdown(product);
+            });
+        }
+
+        // Get activity status
+        function getActivityStatus(product) {
+            const now = new Date();
+            const startTime = new Date(product.startTime);
+            const endTime = new Date(product.endTime);
+
+            if (now < startTime) {
+                return {
+                    text: '即将开始',
+                    badgeClass: 'badge-waiting',
+                    buttonText: '活动未开始',
+                    disabled: true,
+                    countdownLabel: '距离开始'
+                };
+            } else if (now > endTime || product.availableStock <= 0) {
+                return {
+                    text: '已结束',
+                    badgeClass: 'badge-ended',
+                    buttonText: product.availableStock <= 0 ? '已抢光' : '活动已结束',
+                    disabled: true,
+                    countdownLabel: '活动已结束'
+                };
+            } else {
+                return {
+                    text: '抢购中',
+                    badgeClass: 'badge-running',
+                    buttonText: '⚡ 立即抢购',
+                    disabled: false,
+                    countdownLabel: '距离结束'
+                };
+            }
+        }
+
+        // Start countdown
+        function startCountdown(product) {
+            if (countdownTimers[product.id]) {
+                clearInterval(countdownTimers[product.id]);
+            }
+
+            const updateCountdown = () => {
+                const now = new Date();
+                const startTime = new Date(product.startTime);
+                const endTime = new Date(product.endTime);
+                const timerEl = document.getElementById(`timer-${product.id}`);
+                const btnEl = document.getElementById(`btn-${product.id}`);
+
+                let targetTime, label;
+                if (now < startTime) {
+                    targetTime = startTime;
+                    label = '距离开始';
+                } else if (now < endTime) {
+                    targetTime = endTime;
+                    label = '距离结束';
+                } else {
+                    timerEl.textContent = '已结束';
+                    clearInterval(countdownTimers[product.id]);
+                    return;
+                }
+
+                const diff = targetTime - now;
+                const hours = Math.floor(diff / (1000 * 60 * 60));
+                const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+                const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+
+                timerEl.textContent = `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+
+                // Update button when activity starts
+                if (now >= startTime && now < endTime && btnEl.disabled) {
+                    btnEl.disabled = false;
+                    btnEl.textContent = '⚡ 立即抢购';
+                    document.querySelector(`#product-${product.id} .product-badge`).className = 'product-badge badge-running';
+                    document.querySelector(`#product-${product.id} .product-badge`).textContent = '抢购中';
+                }
+            };
+
+            updateCountdown();
+            countdownTimers[product.id] = setInterval(updateCountdown, 1000);
+        }
+
+        // Do flash sale
+        async function doFlashSale(productId) {
+            const btn = document.getElementById(`btn-${productId}`);
+            const originalText = btn.textContent;
+            btn.disabled = true;
+            btn.innerHTML = '<span class="loading"></span>抢购中...';
+
+            try {
+                const response = await fetch('/api/flash/do', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({
+                        productId: productId,
+                        quantity: 1
+                    })
+                });
+
+                const data = await response.json();
+                
+                if (data.code === 200 && data.data.success) {
+                    showModal(true, '🎉 抢购成功！', '恭喜您，商品已抢购成功！请尽快完成支付。', data.data.orderNo);
+                    // Update stock
+                    const stockEl = document.getElementById(`stock-${productId}`);
+                    if (stockEl) {
+                        const currentStock = parseInt(stockEl.textContent) - 1;
+                        stockEl.textContent = currentStock;
+                        if (currentStock < 10) {
+                            stockEl.classList.add('stock-low');
+                        }
+                        if (currentStock <= 0) {
+                            btn.textContent = '已抢光';
+                            btn.disabled = true;
+                        }
+                    }
+                } else {
+                    showModal(false, '😢 抢购失败', data.message || '很遗憾，抢购失败了');
+                    btn.disabled = false;
+                    btn.textContent = originalText;
+                }
+            } catch (error) {
+                showModal(false, '❌ 网络错误', '请检查网络连接后重试');
+                btn.disabled = false;
+                btn.textContent = originalText;
+            }
+        }
+
+        // Show modal
+        function showModal(success, title, message, orderNo = null) {
+            const modal = document.getElementById('resultModal');
+            const icon = document.getElementById('modalIcon');
+            const titleEl = document.getElementById('modalTitle');
+            const messageEl = document.getElementById('modalMessage');
+            const orderNoContainer = document.getElementById('orderNoContainer');
+            const orderNoEl = document.getElementById('orderNo');
+
+            icon.textContent = success ? '✅' : '❌';
+            icon.className = `modal-icon ${success ? 'success' : 'error'}`;
+            titleEl.textContent = title;
+            messageEl.textContent = message;
+
+            if (orderNo) {
+                orderNoContainer.style.display = 'block';
+                orderNoEl.textContent = orderNo;
+            } else {
+                orderNoContainer.style.display = 'none';
+            }
+
+            modal.classList.add('active');
+        }
+
+        // Close modal
+        function closeModal() {
+            document.getElementById('resultModal').classList.remove('active');
+        }
+
+        // Show toast
+        function showToast(message, type = 'info') {
+            const toast = document.getElementById('toast');
+            toast.textContent = message;
+            toast.className = `toast ${type} show`;
+            setTimeout(() => {
+                toast.classList.remove('show');
+            }, 3000);
+        }
+
+        // Close modal on overlay click
+        document.getElementById('resultModal').addEventListener('click', (e) => {
+            if (e.target === e.currentTarget) {
+                closeModal();
+            }
+        });
+    </script>
+</body>
+</html>
+
