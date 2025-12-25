@@ -35,10 +35,12 @@ public class AuthFilter implements Filter {
      * 不需要认证的接口
      */
     private static final List<String> WHITE_LIST = Arrays.asList(
-            "/api/flash/products",  // 商品列表
-            "/api/flash/product/",  // 商品详情
-            "/api/user/login",      // 登录
-            "/api/user/register"    // 注册
+            "/api/flash/products",   // 商品列表
+            "/api/flash/product/",   // 商品详情
+            "/api/flash/test/",      // 压测接口（生产环境删除）
+            "/api/flash/admin/",     // 管理接口
+            "/api/user/login",       // 登录
+            "/api/user/register"     // 注册
     );
 
     @Override

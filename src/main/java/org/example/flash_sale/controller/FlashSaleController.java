@@ -63,7 +63,7 @@ public class FlashSaleController {
     public Result<FlashSaleResponse> doFlashSale(
             @Valid @RequestBody FlashSaleRequest request,
             HttpServletRequest httpRequest) {
-        
+
         // 从过滤器中获取用户ID
         Long userId = (Long) httpRequest.getAttribute("userId");
         if (userId == null) {
@@ -71,7 +71,7 @@ public class FlashSaleController {
         }
 
         FlashSaleResponse response = flashSaleService.doFlashSale(userId, request);
-        
+
         if (response.getSuccess()) {
             return Result.success(response);
         } else {
@@ -96,5 +96,31 @@ public class FlashSaleController {
         productService.warmUpProductCache(productId);
         return Result.success("商品缓存预热完成");
     }
-}
 
+    /**
+     * 压测专用接口 - 跳过登录，直接传userId
+     * 注意：生产环境应删除此接口！
+     */
+    @PostMapping("/test/do")
+    public Result<FlashSaleResponse> doFlashSaleForTest(
+            @RequestParam("userId") Long userId,
+            @RequestParam("productId") Long productId,
+            @RequestParam(value = "quantity", defaultValue = "1") Integer quantity) {
+
+        if (userId == null || productId == null) {
+            return Result.fail(400, "参数不完整");
+        }
+
+        FlashSaleRequest request = new FlashSaleRequest();
+        request.setProductId(productId);
+        request.setQuantity(quantity);
+
+        FlashSaleResponse response = flashSaleService.doFlashSale(userId, request);
+
+        if (response.getSuccess()) {
+            return Result.success(response);
+        } else {
+            return Result.fail(response.getCode(), response.getMessage());
+        }
+    }
+}
