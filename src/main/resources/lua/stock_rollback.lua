@@ -6,25 +6,33 @@
 
 local stockKey = KEYS[1]
 local boughtKey = KEYS[2]
-local userId = ARGV[1]
-local quantity = tonumber(ARGV[2])
+
+-- 处理可能带引号的JSON字符串参数
+local function parseNumber(val)
+    if val == nil then return nil end
+    local str = tostring(val):gsub('"', '')
+    return tonumber(str)
+end
+
+local userId = tostring(ARGV[1]):gsub('"', '')
+local quantity = parseNumber(ARGV[2]) or 0
 
 -- 回滚库存
 local stock = redis.call('GET', stockKey)
 if stock then
-    local currentStock = tonumber(stock)
-    redis.call('SET', stockKey, currentStock + quantity)
+    local currentStock = parseNumber(stock) or 0
+    redis.call('SET', stockKey, tostring(currentStock + quantity))
 end
 
 -- 减少用户购买记录
 local userBought = redis.call('HGET', boughtKey, userId)
 if userBought then
-    local boughtCount = tonumber(userBought)
+    local boughtCount = parseNumber(userBought) or 0
     local newCount = boughtCount - quantity
     if newCount <= 0 then
         redis.call('HDEL', boughtKey, userId)
     else
-        redis.call('HSET', boughtKey, userId, newCount)
+        redis.call('HSET', boughtKey, userId, tostring(newCount))
     end
 end
 

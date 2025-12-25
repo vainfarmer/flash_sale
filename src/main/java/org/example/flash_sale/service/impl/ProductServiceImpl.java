@@ -30,7 +30,7 @@ public class ProductServiceImpl implements ProductService {
     public List<Product> getAllFlashProducts() {
         LambdaQueryWrapper<Product> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(Product::getDeleted, 0)
-               .orderByAsc(Product::getStartTime);
+                .orderByAsc(Product::getStartTime);
         return productMapper.selectList(wrapper);
     }
 
@@ -42,7 +42,7 @@ public class ProductServiceImpl implements ProductService {
         if (cached != null) {
             return (Product) cached;
         }
-        
+
         // 缓存未命中，从数据库获取
         Product product = productMapper.selectById(id);
         if (product != null) {
@@ -64,9 +64,9 @@ public class ProductServiceImpl implements ProductService {
         String productKey = Constants.REDIS_PRODUCT_KEY + productId;
         redisTemplate.opsForValue().set(productKey, product, 24, TimeUnit.HOURS);
 
-        // 缓存库存信息
+        // 缓存库存信息（存储为纯数字字符串，避免JSON序列化问题）
         String stockKey = Constants.REDIS_STOCK_KEY + productId;
-        redisTemplate.opsForValue().set(stockKey, product.getAvailableStock());
+        redisTemplate.opsForValue().set(stockKey, String.valueOf(product.getAvailableStock()));
 
         log.info("商品缓存预热完成: productId={}, stock={}", productId, product.getAvailableStock());
     }
@@ -107,4 +107,3 @@ public class ProductServiceImpl implements ProductService {
         return false;
     }
 }
-

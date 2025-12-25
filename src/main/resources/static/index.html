@@ -491,6 +491,12 @@
                 </div>
                 <button type="submit" class="btn btn-primary">登录</button>
             </form>
+            <div id="serverStatus" class="server-status" style="margin-top: 15px; text-align: center; font-size: 0.85rem; color: var(--text-secondary);">
+                正在检查服务器状态...
+            </div>
+            <div style="margin-top: 15px; text-align: center; font-size: 0.8rem; color: var(--text-secondary);">
+                测试账号: user1 / 123456
+            </div>
         </div>
 
         <!-- Main Content (Hidden until login) -->
@@ -530,25 +536,57 @@
         let countdownTimers = {};
 
         // Initialize
-        document.addEventListener('DOMContentLoaded', () => {
+        document.addEventListener('DOMContentLoaded', async () => {
+            // 先检查后端服务状态
+            await checkServerHealth();
+            
             if (token) {
                 showMainContent();
                 loadProducts();
             }
         });
 
+        // 检查服务器状态
+        async function checkServerHealth() {
+            const statusEl = document.getElementById('serverStatus');
+            try {
+                const response = await fetch('/api/health');
+                if (response.ok) {
+                    statusEl.innerHTML = '✅ 服务器连接正常';
+                    statusEl.style.color = 'var(--success)';
+                } else {
+                    statusEl.innerHTML = '⚠️ 服务器响应异常';
+                    statusEl.style.color = 'var(--accent)';
+                }
+            } catch (error) {
+                console.error('服务器检查失败:', error);
+                statusEl.innerHTML = '⚠️ 服务器连接中...';
+                statusEl.style.color = 'var(--text-secondary)';
+            }
+        }
+
         // Login Form
         document.getElementById('loginForm').addEventListener('submit', async (e) => {
             e.preventDefault();
-            const username = document.getElementById('username').value;
-            const password = document.getElementById('password').value;
+            const usernameInput = document.getElementById('username').value;
+            const passwordInput = document.getElementById('password').value;
+            const submitBtn = e.target.querySelector('button[type="submit"]');
+            
+            // 禁用按钮防止重复提交
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<span class="loading"></span>登录中...';
 
             try {
                 const response = await fetch('/api/user/login', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ username, password })
+                    body: JSON.stringify({ username: usernameInput, password: passwordInput })
                 });
+
+                // 检查响应状态
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
 
                 const data = await response.json();
                 if (data.code === 200) {
@@ -562,7 +600,17 @@
                     showToast(data.message || '登录失败', 'error');
                 }
             } catch (error) {
-                showToast('网络错误，请重试', 'error');
+                console.error('登录错误:', error);
+                if (error.message.includes('Failed to fetch')) {
+                    showToast('无法连接服务器，请确认后端服务已启动', 'error');
+                } else if (error.message.includes('HTTP')) {
+                    showToast('服务器错误: ' + error.message, 'error');
+                } else {
+                    showToast('登录失败: ' + error.message, 'error');
+                }
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.textContent = '登录';
             }
         });
 
@@ -585,12 +633,18 @@
         async function loadProducts() {
             try {
                 const response = await fetch('/api/flash/products');
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
                 const data = await response.json();
                 if (data.code === 200) {
-                    renderProducts(data.data);
+                    renderProducts(data.data || []);
+                } else {
+                    showToast(data.message || '加载商品失败', 'error');
                 }
             } catch (error) {
-                showToast('加载商品失败', 'error');
+                console.error('加载商品错误:', error);
+                showToast('加载商品失败: ' + error.message, 'error');
             }
         }
 

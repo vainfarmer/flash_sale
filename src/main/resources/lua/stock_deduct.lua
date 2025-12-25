@@ -8,20 +8,34 @@
 -- ARGV[3]: 限购数量
 
 -- 返回值:
--- -1: 库存不足
+-- -1: 库存不足/库存未初始化
 -- -2: 重复购买/超出限购
 -- >=0: 扣减成功，返回剩余库存
 
 local stockKey = KEYS[1]
 local boughtKey = KEYS[2]
-local userId = ARGV[1]
-local quantity = tonumber(ARGV[2])
-local limitPerUser = tonumber(ARGV[3])
+
+-- 处理可能带引号的JSON字符串参数
+local function parseNumber(val)
+    if val == nil then return nil end
+    -- 去除可能的引号
+    local str = tostring(val):gsub('"', '')
+    return tonumber(str)
+end
+
+local userId = tostring(ARGV[1]):gsub('"', '')
+local quantity = parseNumber(ARGV[2])
+local limitPerUser = parseNumber(ARGV[3])
+
+-- 参数校验
+if not quantity or not limitPerUser then
+    return -1
+end
 
 -- 检查用户是否已购买（防止重复下单）
 local userBought = redis.call('HGET', boughtKey, userId)
 if userBought then
-    local boughtCount = tonumber(userBought)
+    local boughtCount = parseNumber(userBought) or 0
     if boughtCount + quantity > limitPerUser then
         return -2  -- 超出限购数量
     end
@@ -30,23 +44,23 @@ end
 -- 检查库存
 local stock = redis.call('GET', stockKey)
 if not stock then
-    return -1  -- 库存Key不存在
+    return -1  -- 库存Key不存在，需要先预热
 end
 
-local currentStock = tonumber(stock)
-if currentStock < quantity then
+local currentStock = parseNumber(stock)
+if not currentStock or currentStock < quantity then
     return -1  -- 库存不足
 end
 
 -- 扣减库存
 local newStock = currentStock - quantity
-redis.call('SET', stockKey, newStock)
+redis.call('SET', stockKey, tostring(newStock))
 
 -- 记录用户购买数量
 if userBought then
     redis.call('HINCRBY', boughtKey, userId, quantity)
 else
-    redis.call('HSET', boughtKey, userId, quantity)
+    redis.call('HSET', boughtKey, userId, tostring(quantity))
 end
 
 return newStock

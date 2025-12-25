@@ -50,21 +50,26 @@ public class FlashSaleServiceImpl implements FlashSaleService {
             return FlashSaleResponse.fail(400, "商品不存在");
         }
 
-        // 3. 执行Lua脚本扣减库存（原子操作）
+        // 3. 检查并确保库存已预热到Redis
         String stockKey = Constants.REDIS_STOCK_KEY + productId;
         String boughtKey = Constants.REDIS_USER_BOUGHT_KEY + productId;
 
+        if (!Boolean.TRUE.equals(redisTemplate.hasKey(stockKey))) {
+            log.info("库存未预热，自动预热商品: {}", productId);
+            productService.warmUpProductCache(productId);
+        }
+
+        // 4. 执行Lua脚本扣减库存（原子操作）
         Long result = redisTemplate.execute(
                 stockDeductScript,
                 Arrays.asList(stockKey, boughtKey),
                 userId.toString(),
                 quantity.toString(),
-                product.getLimitPerUser().toString()
-        );
+                product.getLimitPerUser().toString());
 
         log.info("Lua脚本执行结果: result={}", result);
 
-        // 4. 处理扣减结果
+        // 5. 处理扣减结果
         if (result == null || result < -1) {
             return FlashSaleResponse.fail(Constants.CODE_SYSTEM_BUSY, "系统繁忙，请稍后再试");
         }
@@ -77,10 +82,10 @@ public class FlashSaleServiceImpl implements FlashSaleService {
             return FlashSaleResponse.fail(Constants.CODE_REPEAT_BUY, "您已参与过此活动或超出限购数量");
         }
 
-        // 5. 库存扣减成功，生成订单号
+        // 6. 库存扣减成功，生成订单号
         String orderNo = generateOrderNo(userId, productId);
 
-        // 6. 发送订单消息到Kafka（异步创建订单）
+        // 7. 发送订单消息到Kafka（异步创建订单）
         OrderMessage orderMessage = OrderMessage.builder()
                 .orderNo(orderNo)
                 .userId(userId)
@@ -95,7 +100,7 @@ public class FlashSaleServiceImpl implements FlashSaleService {
 
         log.info("秒杀成功，订单消息已发送: orderNo={}", orderNo);
 
-        // 7. 返回成功响应
+        // 8. 返回成功响应
         return FlashSaleResponse.success(orderNo);
     }
 
@@ -107,13 +112,13 @@ public class FlashSaleServiceImpl implements FlashSaleService {
         }
 
         LocalDateTime now = LocalDateTime.now();
-        
+
         // 检查活动时间
         if (now.isBefore(product.getStartTime())) {
             log.info("活动未开始: productId={}", productId);
             return false;
         }
-        
+
         if (now.isAfter(product.getEndTime())) {
             log.info("活动已结束: productId={}", productId);
             return false;
@@ -136,4 +141,3 @@ public class FlashSaleServiceImpl implements FlashSaleService {
         return "FS" + IdUtil.getSnowflakeNextIdStr();
     }
 }
-
