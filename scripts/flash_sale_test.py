@@ -44,6 +44,16 @@ class FlashSaleLoadTest:
         self.base_url = base_url
         self.results: List[TestResult] = []
 
+    @staticmethod
+    def generate_fake_ip(user_id: int) -> str:
+        """根据用户ID生成模拟IP地址"""
+        # 生成 10.x.x.x 格式的内网IP，避免与真实IP冲突
+        b1 = 10
+        b2 = (user_id // 65536) % 256
+        b3 = (user_id // 256) % 256
+        b4 = user_id % 256
+        return f"{b1}.{b2}.{b3}.{b4}"
+
     async def do_flash_sale(
         self, session: aiohttp.ClientSession, user_id: int, product_id: int
     ) -> TestResult:
@@ -52,10 +62,17 @@ class FlashSaleLoadTest:
         url = f"{self.base_url}/api/flash/test/do"
         params = {"userId": user_id, "productId": product_id, "quantity": 1}
 
+        # 模拟不同IP，绑过IP限流
+        fake_ip = self.generate_fake_ip(user_id)
+        headers = {
+            "X-Forwarded-For": fake_ip,
+            "X-Real-IP": fake_ip,
+        }
+
         start_time = time.time()
 
         try:
-            async with session.post(url, params=params) as response:
+            async with session.post(url, params=params, headers=headers) as response:
                 response_time = (time.time() - start_time) * 1000
                 status_code = response.status
                 data = await response.json()

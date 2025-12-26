@@ -71,7 +71,7 @@ public class FlashSaleServiceImpl implements FlashSaleService {
 
         // 5. 处理扣减结果
         if (result == null || result < -1) {
-            return FlashSaleResponse.fail(Constants.CODE_SYSTEM_BUSY, "系统繁忙，请稍后再试");
+            return FlashSaleResponse.fail(Constants.CODE_SYSTEM_BUSY, "FlashSaleServiceImpl, 系统繁忙，请稍后再试");
         }
 
         if (result == -1) {

@@ -34,7 +34,7 @@ public class RateLimitFilter implements Filter {
     /**
      * IP限流：每秒最大请求数
      */
-    private static final int IP_LIMIT_PER_SECOND = 10;
+    private static final int IP_LIMIT_PER_SECOND = 50;
 
     /**
      * IP限流时间窗口（秒）
