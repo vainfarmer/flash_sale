@@ -6,10 +6,15 @@
 功能：
 1. 模拟多用户并发抢购（无需登录）
 2. 可配置并发数、用户数、商品ID
-3. 统计成功/失败数量、响应时间
+3. 支持两种模式：Redis+Lua+Kafka 或 直接数据库
+4. 统计成功/失败数量、响应时间
 
 使用方法：
+    # Redis + Lua + Kafka 方案（默认）
     python flash_sale_test.py --users 200 --concurrency 50 --product 1
+
+    # 直接操作数据库方案
+    python flash_sale_test.py --users 200 --concurrency 50 --product 1 --mode direct
 
 依赖安装：
     pip install aiohttp
@@ -40,29 +45,35 @@ class TestResult:
 class FlashSaleLoadTest:
     """秒杀压力测试类"""
 
-    def __init__(self, base_url: str = "http://localhost:8080"):
+    def __init__(self, base_url: str = "http://localhost:8080", mode: str = "redis"):
         self.base_url = base_url
+        self.mode = mode  # "redis" 或 "direct"
         self.results: List[TestResult] = []
 
     @staticmethod
     def generate_fake_ip(user_id: int) -> str:
         """根据用户ID生成模拟IP地址"""
-        # 生成 10.x.x.x 格式的内网IP，避免与真实IP冲突
         b1 = 10
         b2 = (user_id // 65536) % 256
         b3 = (user_id // 256) % 256
         b4 = user_id % 256
         return f"{b1}.{b2}.{b3}.{b4}"
 
+    def get_api_url(self) -> str:
+        """根据模式返回不同的API地址"""
+        if self.mode == "direct":
+            return f"{self.base_url}/api/flash/test/do-direct"
+        else:
+            return f"{self.base_url}/api/flash/test/do"
+
     async def do_flash_sale(
         self, session: aiohttp.ClientSession, user_id: int, product_id: int
     ) -> TestResult:
-        """执行秒杀请求（无需登录，直接传userId）"""
-        # 使用测试接口，跳过登录
-        url = f"{self.base_url}/api/flash/test/do"
+        """执行秒杀请求"""
+        url = self.get_api_url()
         params = {"userId": user_id, "productId": product_id, "quantity": 1}
 
-        # 模拟不同IP，绑过IP限流
+        # 模拟不同IP
         fake_ip = self.generate_fake_ip(user_id)
         headers = {
             "X-Forwarded-For": fake_ip,
@@ -108,14 +119,17 @@ class FlashSaleLoadTest:
 
     async def run_test(self, user_count: int, product_id: int, concurrency: int):
         """执行秒杀压测"""
-        print(f"\n🚀 开始秒杀压测（无需登录）...")
+        mode_name = "Redis + Lua + Kafka" if self.mode == "redis" else "直接数据库"
+
+        print(f"\n🚀 开始秒杀压测...")
+        print(f"   测试模式: {mode_name}")
         print(f"   商品ID: {product_id}")
         print(f"   参与用户: {user_count}")
         print(f"   并发数: {concurrency}")
         print("-" * 50)
 
         connector = aiohttp.TCPConnector(limit=concurrency)
-        timeout = aiohttp.ClientTimeout(total=60)
+        timeout = aiohttp.ClientTimeout(total=120)
 
         async with aiohttp.ClientSession(
             connector=connector, timeout=timeout
@@ -128,7 +142,6 @@ class FlashSaleLoadTest:
 
             start_time = time.time()
 
-            # 生成用户ID列表（1到user_count）
             tasks = [flash_sale_with_semaphore(i) for i in range(1, user_count + 1)]
 
             self.results = await asyncio.gather(*tasks)
@@ -139,8 +152,10 @@ class FlashSaleLoadTest:
 
     def print_statistics(self, total_time: float):
         """打印统计结果"""
+        mode_name = "Redis + Lua + Kafka" if self.mode == "redis" else "直接数据库"
+
         print("\n" + "=" * 60)
-        print("📊 压测结果统计")
+        print(f"📊 压测结果统计 [{mode_name}]")
         print("=" * 60)
 
         total = len(self.results)
@@ -188,11 +203,9 @@ class FlashSaleLoadTest:
             for reason, count in fail_reasons.most_common(10):
                 print(f"   {reason}: {count}次")
 
-        # 成功的订单
         if success_count > 0:
             success_results = [r for r in self.results if r.success]
             print(f"\n✅ 成功抢购用户: {len(success_results)}人")
-            # 显示部分成功用户
             if len(success_results) <= 10:
                 for r in success_results:
                     print(f"   用户{r.user_id}: {r.order_no}")
@@ -203,33 +216,38 @@ class FlashSaleLoadTest:
 
         print("\n" + "=" * 60)
 
-        # 检测是否有超卖
-        if success_count > 100:  # 假设库存是100
-            print(f"\n⚠️ 警告: 成功数({success_count}) > 预期库存(100)，可能存在超卖！")
-
 
 async def main():
-    parser = argparse.ArgumentParser(description="秒杀系统并发压力测试（无需登录）")
+    parser = argparse.ArgumentParser(description="秒杀系统并发压力测试")
     parser.add_argument(
         "--url", type=str, default="http://localhost:8080", help="服务器地址"
     )
     parser.add_argument("--users", type=int, default=200, help="参与抢购的用户数量")
     parser.add_argument("--concurrency", type=int, default=50, help="并发数")
     parser.add_argument("--product", type=int, default=1, help="商品ID")
+    parser.add_argument(
+        "--mode",
+        type=str,
+        default="redis",
+        choices=["redis", "direct"],
+        help="测试模式: redis(Redis+Lua+Kafka) 或 direct(直接数据库)",
+    )
 
     args = parser.parse_args()
 
+    mode_name = "Redis + Lua + Kafka" if args.mode == "redis" else "直接数据库"
+
     print("=" * 60)
-    print("⚡ 秒杀系统并发压力测试（跳过登录）")
+    print("⚡ 秒杀系统并发压力测试")
     print("=" * 60)
     print(f"服务器: {args.url}")
+    print(f"测试模式: {mode_name}")
     print(f"用户数: {args.users}")
     print(f"并发数: {args.concurrency}")
     print(f"商品ID: {args.product}")
 
-    tester = FlashSaleLoadTest(args.url)
+    tester = FlashSaleLoadTest(args.url, args.mode)
 
-    # 直接执行秒杀压测（无需登录）
     await tester.run_test(args.users, args.product, args.concurrency)
 
 

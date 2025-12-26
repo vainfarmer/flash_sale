@@ -98,7 +98,7 @@ public class FlashSaleController {
     }
 
     /**
-     * 压测专用接口 - 跳过登录，直接传userId
+     * 压测专用接口 - Redis + Lua + Kafka 方案
      * 注意：生产环境应删除此接口！
      */
     @PostMapping("/test/do")
@@ -116,6 +116,34 @@ public class FlashSaleController {
         request.setQuantity(quantity);
 
         FlashSaleResponse response = flashSaleService.doFlashSale(userId, request);
+
+        if (response.getSuccess()) {
+            return Result.success(response);
+        } else {
+            return Result.fail(response.getCode(), response.getMessage());
+        }
+    }
+
+    /**
+     * 压测专用接口 - 直接操作数据库方案（用于性能对比）
+     * 不使用Redis缓存、Lua脚本、Kafka
+     * 注意：生产环境应删除此接口！
+     */
+    @PostMapping("/test/do-direct")
+    public Result<FlashSaleResponse> doFlashSaleDirectForTest(
+            @RequestParam("userId") Long userId,
+            @RequestParam("productId") Long productId,
+            @RequestParam(value = "quantity", defaultValue = "1") Integer quantity) {
+
+        if (userId == null || productId == null) {
+            return Result.fail(400, "参数不完整");
+        }
+
+        FlashSaleRequest request = new FlashSaleRequest();
+        request.setProductId(productId);
+        request.setQuantity(quantity);
+
+        FlashSaleResponse response = flashSaleService.doFlashSaleDirect(userId, request);
 
         if (response.getSuccess()) {
             return Result.success(response);

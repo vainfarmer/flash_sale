@@ -7,16 +7,22 @@ import org.example.flash_sale.common.Constants;
 import org.example.flash_sale.dto.FlashSaleRequest;
 import org.example.flash_sale.dto.FlashSaleResponse;
 import org.example.flash_sale.dto.OrderMessage;
+import org.example.flash_sale.entity.Order;
 import org.example.flash_sale.entity.Product;
+import org.example.flash_sale.mapper.OrderMapper;
+import org.example.flash_sale.mapper.ProductMapper;
 import org.example.flash_sale.mq.OrderProducer;
 import org.example.flash_sale.service.FlashSaleService;
 import org.example.flash_sale.service.ProductService;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.Arrays;
+import java.util.List;
 
 /**
  * 秒杀服务实现
@@ -30,6 +36,8 @@ public class FlashSaleServiceImpl implements FlashSaleService {
     private final RedisTemplate<String, Object> redisTemplate;
     private final DefaultRedisScript<Long> stockDeductScript;
     private final ProductService productService;
+    private final ProductMapper productMapper;
+    private final OrderMapper orderMapper;
     private final OrderProducer orderProducer;
 
     @Override
@@ -70,8 +78,8 @@ public class FlashSaleServiceImpl implements FlashSaleService {
         log.info("Lua脚本执行结果: result={}", result);
 
         // 5. 处理扣减结果
-        if (result == null || result < -1) {
-            return FlashSaleResponse.fail(Constants.CODE_SYSTEM_BUSY, "FlashSaleServiceImpl, 系统繁忙，请稍后再试");
+        if (result == null) {
+            return FlashSaleResponse.fail(Constants.CODE_SYSTEM_BUSY, "系统繁忙，请稍后再试");
         }
 
         if (result == -1) {
@@ -134,8 +142,90 @@ public class FlashSaleServiceImpl implements FlashSaleService {
     }
 
     /**
+     * 乐观锁最大重试次数
+     */
+    private static final int MAX_RETRY_TIMES = 10;
+
+    /**
+     * 直接操作数据库的秒杀方法（用于性能对比）
+     * 不使用Redis缓存、Lua脚本、Kafka
+     * 直接查询数据库、扣减库存、创建订单
+     * 使用乐观锁 + 重试机制
+     */
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public FlashSaleResponse doFlashSaleDirect(Long userId, FlashSaleRequest request) {
+        Long productId = request.getProductId();
+        Integer quantity = request.getQuantity();
+
+        log.debug("用户 {} 发起直接秒杀请求: productId={}, quantity={}", userId, productId, quantity);
+
+        // 1. 检查是否重复购买（先检查，避免无效重试）
+        List<Order> existOrders = orderMapper.selectByUserAndProduct(userId, productId);
+        int boughtCount = existOrders.stream()
+                .filter(o -> o.getStatus() != Constants.ORDER_STATUS_CANCELLED)
+                .mapToInt(Order::getQuantity)
+                .sum();
+
+        // 2. 乐观锁重试机制
+        for (int retry = 0; retry < MAX_RETRY_TIMES; retry++) {
+            // 每次重试都重新读取最新数据
+            Product product = productMapper.selectById(productId);
+            if (product == null) {
+                return FlashSaleResponse.fail(400, "商品不存在");
+            }
+
+            // 检查活动状态
+            LocalDateTime now = LocalDateTime.now();
+            if (now.isBefore(product.getStartTime()) || now.isAfter(product.getEndTime())) {
+                return FlashSaleResponse.fail(Constants.CODE_ACTIVITY_NOT_START, "活动未开始或已结束");
+            }
+            if (product.getStatus() != Constants.ACTIVITY_STATUS_RUNNING) {
+                return FlashSaleResponse.fail(Constants.CODE_ACTIVITY_NOT_START, "活动未开始");
+            }
+
+            // 检查库存
+            if (product.getAvailableStock() < quantity) {
+                return FlashSaleResponse.fail(Constants.CODE_STOCK_NOT_ENOUGH, "库存不足，秒杀失败");
+            }
+
+            // 检查限购
+            if (boughtCount + quantity > product.getLimitPerUser()) {
+                return FlashSaleResponse.fail(Constants.CODE_REPEAT_BUY, "超出限购数量");
+            }
+
+            // 使用乐观锁扣减库存
+            int rows = productMapper.deductStockWithOptimisticLock(
+                    productId, quantity, product.getVersion());
+
+            if (rows > 0) {
+                // 扣减成功，创建订单
+                String orderNo = generateOrderNo(userId, productId);
+                Order order = new Order();
+                order.setOrderNo(orderNo);
+                order.setUserId(userId);
+                order.setProductId(productId);
+                order.setProductName(product.getProductName());
+                order.setQuantity(quantity);
+                order.setAmount(product.getFlashPrice().multiply(BigDecimal.valueOf(quantity)));
+                order.setStatus(Constants.ORDER_STATUS_PENDING);
+
+                orderMapper.insert(order);
+                log.debug("直接秒杀成功(重试{}次): orderNo={}", retry, orderNo);
+                return FlashSaleResponse.success(orderNo);
+            }
+
+            // 乐观锁冲突，重试
+            log.debug("乐观锁冲突，第{}次重试", retry + 1);
+        }
+
+        // 重试次数用完仍然失败
+        return FlashSaleResponse.fail(Constants.CODE_STOCK_NOT_ENOUGH, "系统繁忙，请重试");
+    }
+
+    /**
      * 生成订单号
-     * 格式：FS + 时间戳 + 用户ID后4位 + 商品ID后4位 + 随机数
+     * 格式：FS + 雪花ID
      */
     private String generateOrderNo(Long userId, Long productId) {
         return "FS" + IdUtil.getSnowflakeNextIdStr();
