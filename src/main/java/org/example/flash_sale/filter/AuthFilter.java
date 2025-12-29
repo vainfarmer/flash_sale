@@ -39,6 +39,7 @@ public class AuthFilter implements Filter {
             "/api/flash/product/",   // 商品详情
             "/api/flash/test/",      // 压测接口（生产环境删除）
             "/api/flash/admin/",     // 管理接口
+            "/api/admin/",           // 管理接口（一致性检查等）
             "/api/user/login",       // 登录
             "/api/user/register"     // 注册
     );

@@ -7,6 +7,7 @@
 | `insert_users.sql` | 批量插入500个测试用户的SQL |
 | `generate_users.py` | 生成批量用户SQL的工具 |
 | `flash_sale_test.py` | 并发压测脚本 |
+| `test_consistency.py` | 库存一致性检查脚本 |
 | `requirements.txt` | Python依赖 |
 
 ## 🚀 使用步骤
@@ -120,5 +121,56 @@ DELETE FROM t_order WHERE product_id = 1;
 # 清除Redis购买记录
 redis-cli DEL flash:bought:1
 redis-cli SET flash:stock:1 100
+```
+
+---
+
+## 🔍 库存一致性检查
+
+### 功能说明
+
+用于检查和修复Redis与数据库之间的库存一致性，确保最终一致性。
+
+### 使用方法
+
+```bash
+# 查看一致性报告
+python test_consistency.py --action report
+
+# 检查单个商品
+python test_consistency.py --action check --product-id 1
+
+# 检查所有商品
+python test_consistency.py --action check-all
+
+# 修复单个商品（以数据库为准）
+python test_consistency.py --action repair --product-id 1
+
+# 修复单个商品（以Redis为准）
+python test_consistency.py --action repair --product-id 1 --use-redis
+
+# 修复所有不一致的商品
+python test_consistency.py --action repair-all
+```
+
+### API接口
+
+| 接口 | 方法 | 说明 |
+|------|------|------|
+| `/api/admin/consistency/check/{productId}` | GET | 检查单个商品一致性 |
+| `/api/admin/consistency/check-all` | GET | 检查所有商品一致性 |
+| `/api/admin/consistency/repair/{productId}` | POST | 修复单个商品 |
+| `/api/admin/consistency/repair-all` | POST | 修复所有商品 |
+| `/api/admin/consistency/report` | GET | 获取详细报告 |
+
+### 定时任务
+
+系统会每5分钟自动检查一致性（可在 `application.yml` 中配置）：
+
+```yaml
+flash-sale:
+  consistency:
+    check-cron: "0 */5 * * * ?"  # 检查间隔
+    auto-repair: false           # 是否自动修复
 ```
 
