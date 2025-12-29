@@ -72,6 +72,14 @@ jwt:
   # Token有效期：24小时
   expiration: 86400000
 
+# 订单超时配置
+order:
+  timeout:
+    # 订单超时时间（分钟），默认30分钟
+    minutes: 30
+    # 是否启用订单超时自动取消
+    enabled: true
+
 # 日志配置
 logging:
   level:

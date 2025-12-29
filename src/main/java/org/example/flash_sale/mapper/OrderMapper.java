@@ -31,5 +31,11 @@ public interface OrderMapper extends BaseMapper<Order> {
      */
     @Select("SELECT * FROM t_order WHERE user_id = #{userId} ORDER BY create_time DESC")
     List<Order> selectByUserId(@Param("userId") Long userId);
+
+    /**
+     * 查询所有待支付订单
+     */
+    @Select("SELECT * FROM t_order WHERE status = 0 AND deleted = 0")
+    List<Order> selectPendingOrders();
 }
 

@@ -6,7 +6,9 @@ import org.example.flash_sale.common.Constants;
 import org.example.flash_sale.entity.Order;
 import org.example.flash_sale.mapper.OrderMapper;
 import org.example.flash_sale.service.OrderService;
+import org.example.flash_sale.service.OrderTimeoutService;
 import org.example.flash_sale.service.ProductService;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.stereotype.Service;
@@ -28,6 +30,8 @@ public class OrderServiceImpl implements OrderService {
     private final ProductService productService;
     private final RedisTemplate<String, Object> redisTemplate;
     private final DefaultRedisScript<Long> stockRollbackScript;
+    @Lazy
+    private final OrderTimeoutService orderTimeoutService;
 
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -86,6 +90,9 @@ public class OrderServiceImpl implements OrderService {
         int rows = orderMapper.updateById(order);
         
         if (rows > 0) {
+            // 从超时队列中移除订单
+            orderTimeoutService.removeOrderFromTimeoutQueue(orderNo);
+            
             // 回滚数据库库存
             productService.rollbackStock(order.getProductId(), order.getQuantity());
             
@@ -124,6 +131,9 @@ public class OrderServiceImpl implements OrderService {
         int rows = orderMapper.updateById(order);
         
         if (rows > 0) {
+            // 从超时队列中移除订单（避免已支付订单被取消）
+            orderTimeoutService.removeOrderFromTimeoutQueue(orderNo);
+            
             log.info("订单支付成功: orderNo={}", orderNo);
             return true;
         }

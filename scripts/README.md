@@ -122,3 +122,34 @@ redis-cli DEL flash:bought:1
 redis-cli SET flash:stock:1 100
 ```
 
+---
+
+## ⏰ 订单超时自动取消
+
+### 功能说明
+
+使用 Redisson 延迟队列实现订单超时自动取消：
+- 订单创建后自动加入延迟队列
+- 超时未支付的订单自动取消
+- 取消订单时自动回滚 Redis 和 数据库 库存
+- 支付成功后自动从队列移除
+
+### 配置项（application.yml）
+
+```yaml
+order:
+  timeout:
+    minutes: 30      # 超时时间（分钟）
+    enabled: true    # 是否启用
+```
+
+### 管理接口
+
+| 接口 | 方法 | 说明 |
+|------|------|------|
+| `/api/admin/order-timeout/status` | GET | 查看队列状态 |
+| `/api/admin/order-timeout/add/{orderNo}` | POST | 手动加入队列 |
+| `/api/admin/order-timeout/remove/{orderNo}` | POST | 从队列移除 |
+| `/api/admin/order-timeout/process/{orderNo}` | POST | 手动处理超时 |
+| `/api/admin/order-timeout/process-all-pending` | POST | 批量处理所有待支付 |
+

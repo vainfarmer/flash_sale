@@ -8,6 +8,7 @@ import org.example.flash_sale.common.Constants;
 import org.example.flash_sale.dto.OrderMessage;
 import org.example.flash_sale.entity.Order;
 import org.example.flash_sale.service.OrderService;
+import org.example.flash_sale.service.OrderTimeoutService;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.kafka.support.Acknowledgment;
 import org.springframework.stereotype.Component;
@@ -22,6 +23,7 @@ import org.springframework.stereotype.Component;
 public class OrderConsumer {
 
     private final OrderService orderService;
+    private final OrderTimeoutService orderTimeoutService;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     /**
@@ -62,6 +64,10 @@ public class OrderConsumer {
             boolean success = orderService.createOrder(order);
             if (success) {
                 log.info("订单创建成功: orderNo={}", orderNo);
+                
+                // 将订单加入超时延迟队列（超时未支付自动取消）
+                orderTimeoutService.addOrderToTimeoutQueue(orderNo);
+                
                 // 手动确认消息
                 ack.acknowledge();
             } else {

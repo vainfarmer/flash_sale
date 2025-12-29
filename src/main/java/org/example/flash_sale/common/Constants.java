@@ -45,6 +45,18 @@ public class Constants {
      */
     public static final String REDIS_ACTIVITY_KEY = "flash:activity:";
 
+    // ==================== Redisson 延迟队列 ====================
+
+    /**
+     * 订单超时延迟队列名称
+     */
+    public static final String ORDER_TIMEOUT_QUEUE = "order:timeout:queue";
+
+    /**
+     * 订单超时延迟队列（延迟部分）
+     */
+    public static final String ORDER_TIMEOUT_DELAY_QUEUE = "order:timeout:delay";
+
     // ==================== Kafka Topic ====================
 
     /**
