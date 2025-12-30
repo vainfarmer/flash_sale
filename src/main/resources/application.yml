@@ -29,7 +29,7 @@ spring:
       database: 0
       lettuce:
         pool:
-          max-active: 100
+          max-active: 200
           max-wait: -1
           max-idle: 20
           min-idle: 10
@@ -72,13 +72,13 @@ jwt:
   # Token有效期：24小时
   expiration: 86400000
 
-# 秒杀配置
-flash-sale:
-  consistency:
-    # 一致性检查cron表达式（默认每5分钟）
-    check-cron: "0 */5 * * * ?"
-    # 是否自动修复不一致（默认关闭，建议手动确认后修复）
-    auto-repair: false
+# 订单超时配置
+order:
+  timeout:
+    # 订单超时时间（分钟），默认30分钟
+    minutes: 30
+    # 是否启用订单超时自动取消
+    enabled: true
 
 # 日志配置
 logging:
