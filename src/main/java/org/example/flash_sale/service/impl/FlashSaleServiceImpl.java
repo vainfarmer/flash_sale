@@ -114,10 +114,12 @@ public class FlashSaleServiceImpl implements FlashSaleService {
         return FlashSaleResponse.success(orderNo);
     }
 
-    /**
-     * 异步秒杀（使用虚拟线程执行器）
-     * 释放Tomcat线程，提高并发处理能力
-     */
+  // ==================== 异步接口（使用虚拟线程）====================
+
+  /**
+   * 异步秒杀接口 - Redis + Lua + Kafka 方案（虚拟线程）
+   * 释放Tomcat线程，提高并发处理能力
+   */
     @Override
     @Async("flashSaleExecutor")
     public CompletableFuture<FlashSaleResponse> doFlashSaleAsync(Long userId, FlashSaleRequest request) {
