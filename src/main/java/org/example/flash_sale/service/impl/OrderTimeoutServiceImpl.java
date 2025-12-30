@@ -222,7 +222,7 @@ public class OrderTimeoutServiceImpl implements OrderTimeoutService {
             try {
                 // 阻塞等待超时订单（最多等待1秒，然后检查running状态）
                 String orderNo = blockingQueue.poll(1, TimeUnit.SECONDS);
-                
+
                 if (orderNo != null) {
                     // 处理超时订单
                     try {
@@ -263,8 +263,7 @@ public class OrderTimeoutServiceImpl implements OrderTimeoutService {
                     stockRollbackScript,
                     Arrays.asList(stockKey, boughtKey),
                     userId.toString(),
-                    quantity.toString()
-            );
+                    quantity.toString());
             log.debug("Redis库存回滚成功: productId={}, userId={}, quantity={}",
                     productId, userId, quantity);
         } catch (Exception e) {
@@ -273,4 +272,3 @@ public class OrderTimeoutServiceImpl implements OrderTimeoutService {
         }
     }
 }
-
