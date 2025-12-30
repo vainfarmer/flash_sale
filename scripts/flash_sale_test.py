@@ -6,8 +6,12 @@
 功能：
 1. 模拟多用户并发抢购（无需登录）
 2. 可配置并发数、用户数、商品ID
-3. 支持两种模式：Redis+Lua+Kafka 或 直接数据库
-4. 统计成功/失败数量、响应时间
+3. 支持四种模式：
+   - redis: Redis+Lua+Kafka（同步）
+   - direct: 直接数据库（同步）
+   - redis-async: Redis+Lua+Kafka（异步/虚拟线程）
+   - direct-async: 直接数据库（异步/虚拟线程）
+4. 统计成功/失败数量、响应时间、QPS
 
 使用方法：
     # Redis + Lua + Kafka 方案（默认）
@@ -15,6 +19,12 @@
 
     # 直接操作数据库方案
     python flash_sale_test.py --users 200 --concurrency 50 --product 1 --mode direct
+
+    # 异步 Redis 方案（虚拟线程）
+    python flash_sale_test.py --users 500 --concurrency 200 --product 1 --mode redis-async
+
+    # 异步直接数据库方案（虚拟线程）
+    python flash_sale_test.py --users 500 --concurrency 200 --product 1 --mode direct-async
 
 依赖安装：
     pip install aiohttp
@@ -61,10 +71,23 @@ class FlashSaleLoadTest:
 
     def get_api_url(self) -> str:
         """根据模式返回不同的API地址"""
-        if self.mode == "direct":
-            return f"{self.base_url}/api/flash/test/do-direct"
-        else:
-            return f"{self.base_url}/api/flash/test/do"
+        urls = {
+            "redis": f"{self.base_url}/api/flash/test/do",
+            "direct": f"{self.base_url}/api/flash/test/do-direct",
+            "redis-async": f"{self.base_url}/api/flash/test/do-async",
+            "direct-async": f"{self.base_url}/api/flash/test/do-direct-async",
+        }
+        return urls.get(self.mode, urls["redis"])
+
+    def get_mode_name(self) -> str:
+        """获取模式的中文名称"""
+        names = {
+            "redis": "Redis + Lua + Kafka（同步）",
+            "direct": "直接数据库（同步）",
+            "redis-async": "Redis + Lua + Kafka（异步/虚拟线程）",
+            "direct-async": "直接数据库（异步/虚拟线程）",
+        }
+        return names.get(self.mode, self.mode)
 
     async def do_flash_sale(
         self, session: aiohttp.ClientSession, user_id: int, product_id: int
@@ -119,7 +142,7 @@ class FlashSaleLoadTest:
 
     async def run_test(self, user_count: int, product_id: int, concurrency: int):
         """执行秒杀压测"""
-        mode_name = "Redis + Lua + Kafka" if self.mode == "redis" else "直接数据库"
+        mode_name = self.get_mode_name()
 
         print(f"\n🚀 开始秒杀压测...")
         print(f"   测试模式: {mode_name}")
@@ -152,7 +175,7 @@ class FlashSaleLoadTest:
 
     def print_statistics(self, total_time: float):
         """打印统计结果"""
-        mode_name = "Redis + Lua + Kafka" if self.mode == "redis" else "直接数据库"
+        mode_name = self.get_mode_name()
 
         print("\n" + "=" * 60)
         print(f"📊 压测结果统计 [{mode_name}]")
@@ -229,13 +252,14 @@ async def main():
         "--mode",
         type=str,
         default="redis",
-        choices=["redis", "direct"],
-        help="测试模式: redis(Redis+Lua+Kafka) 或 direct(直接数据库)",
+        choices=["redis", "direct", "redis-async", "direct-async"],
+        help="测试模式: redis/direct(同步) 或 redis-async/direct-async(异步/虚拟线程)",
     )
 
     args = parser.parse_args()
 
-    mode_name = "Redis + Lua + Kafka" if args.mode == "redis" else "直接数据库"
+    tester = FlashSaleLoadTest(args.url, args.mode)
+    mode_name = tester.get_mode_name()
 
     print("=" * 60)
     print("⚡ 秒杀系统并发压力测试")
@@ -245,8 +269,6 @@ async def main():
     print(f"用户数: {args.users}")
     print(f"并发数: {args.concurrency}")
     print(f"商品ID: {args.product}")
-
-    tester = FlashSaleLoadTest(args.url, args.mode)
 
     await tester.run_test(args.users, args.product, args.concurrency)
 

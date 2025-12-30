@@ -153,3 +153,55 @@ order:
 | `/api/admin/order-timeout/process/{orderNo}` | POST | 手动处理超时 |
 | `/api/admin/order-timeout/process-all-pending` | POST | 批量处理所有待支付 |
 
+---
+
+## 🚀 性能优化（虚拟线程 + 异步）
+
+### 优化内容
+
+1. **虚拟线程（Java 21+）**
+   - Tomcat 启用虚拟线程处理请求
+   - 异步接口使用虚拟线程执行器
+
+2. **连接池优化**
+   - MySQL HikariCP: 最大连接数 100
+   - Redis Lettuce: 最大连接数 500
+
+3. **异步秒杀接口**
+   - `/api/flash/test/do-async` - Redis方案（异步）
+   - `/api/flash/test/do-direct-async` - 直接DB方案（异步）
+
+### 压测模式
+
+| 模式 | 参数 | 说明 |
+|------|------|------|
+| `redis` | `--mode redis` | Redis+Lua+Kafka（同步） |
+| `direct` | `--mode direct` | 直接数据库（同步） |
+| `redis-async` | `--mode redis-async` | Redis方案（异步/虚拟线程） |
+| `direct-async` | `--mode direct-async` | 直接DB（异步/虚拟线程） |
+
+### 压测命令
+
+```bash
+# 同步 Redis 方案
+python flash_sale_test.py --users 500 --concurrency 100 --mode redis
+
+# 异步 Redis 方案（虚拟线程）- 可支持更高并发
+python flash_sale_test.py --users 500 --concurrency 200 --mode redis-async
+
+# 同步 直接DB 方案
+python flash_sale_test.py --users 500 --concurrency 100 --mode direct
+
+# 异步 直接DB 方案（虚拟线程）
+python flash_sale_test.py --users 500 --concurrency 200 --mode direct-async
+```
+
+### 预期效果
+
+| 模式 | 建议并发 | QPS提升 |
+|------|---------|---------|
+| 同步 Redis | 50-100 | 基准 |
+| 异步 Redis（虚拟线程） | 100-300 | 50-100% |
+| 同步 直接DB | 50-100 | 基准 |
+| 异步 直接DB（虚拟线程） | 100-200 | 30-50% |
+

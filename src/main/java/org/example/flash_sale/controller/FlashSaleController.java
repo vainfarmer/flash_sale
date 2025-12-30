@@ -13,6 +13,7 @@ import org.example.flash_sale.service.ProductService;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 
 /**
  * 秒杀控制器
@@ -150,5 +151,62 @@ public class FlashSaleController {
         } else {
             return Result.fail(response.getCode(), response.getMessage());
         }
+    }
+
+    // ==================== 异步接口（使用虚拟线程）====================
+
+    /**
+     * 异步秒杀接口 - Redis + Lua + Kafka 方案（虚拟线程）
+     * 释放Tomcat线程，提高并发处理能力
+     */
+    @PostMapping("/test/do-async")
+    public CompletableFuture<Result<FlashSaleResponse>> doFlashSaleAsync(
+            @RequestParam("userId") Long userId,
+            @RequestParam("productId") Long productId,
+            @RequestParam(value = "quantity", defaultValue = "1") Integer quantity) {
+
+        if (userId == null || productId == null) {
+            return CompletableFuture.completedFuture(Result.fail(400, "参数不完整"));
+        }
+
+        FlashSaleRequest request = new FlashSaleRequest();
+        request.setProductId(productId);
+        request.setQuantity(quantity);
+
+        return flashSaleService.doFlashSaleAsync(userId, request)
+                .thenApply(response -> {
+                    if (response.getSuccess()) {
+                        return Result.success(response);
+                    } else {
+                        return Result.fail(response.getCode(), response.getMessage());
+                    }
+                });
+    }
+
+    /**
+     * 异步秒杀接口 - 直接数据库方案（虚拟线程）
+     */
+    @PostMapping("/test/do-direct-async")
+    public CompletableFuture<Result<FlashSaleResponse>> doFlashSaleDirectAsync(
+            @RequestParam("userId") Long userId,
+            @RequestParam("productId") Long productId,
+            @RequestParam(value = "quantity", defaultValue = "1") Integer quantity) {
+
+        if (userId == null || productId == null) {
+            return CompletableFuture.completedFuture(Result.fail(400, "参数不完整"));
+        }
+
+        FlashSaleRequest request = new FlashSaleRequest();
+        request.setProductId(productId);
+        request.setQuantity(quantity);
+
+        return flashSaleService.doFlashSaleDirectAsync(userId, request)
+                .thenApply(response -> {
+                    if (response.getSuccess()) {
+                        return Result.success(response);
+                    } else {
+                        return Result.fail(response.getCode(), response.getMessage());
+                    }
+                });
     }
 }

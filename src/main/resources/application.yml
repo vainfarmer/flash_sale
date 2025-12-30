@@ -1,5 +1,13 @@
 server:
   port: 8080
+  tomcat:
+    # 启用虚拟线程（Java 21+）
+    threads:
+      max: 400              # 最大工作线程数
+      min-spare: 50         # 最小空闲线程数
+    max-connections: 20000  # 最大连接数
+    accept-count: 2000      # 等待队列长度
+    connection-timeout: 3000 # 连接超时（毫秒）
 
 spring:
   application:
@@ -7,32 +15,42 @@ spring:
   devtools:
     restart:
       enabled: false
+  # 启用虚拟线程（Java 21+）
+  threads:
+    virtual:
+      enabled: true
 
-  # 数据源配置
+  # 数据源配置（优化后）
   datasource:
-    url: jdbc:mysql://localhost:3306/flash_sale?useUnicode=true&characterEncoding=utf-8&serverTimezone=Asia/Shanghai&useSSL=false
+    url: jdbc:mysql://localhost:3306/flash_sale?useUnicode=true&characterEncoding=utf-8&serverTimezone=Asia/Shanghai&useSSL=false&rewriteBatchedStatements=true&cachePrepStmts=true&prepStmtCacheSize=500&prepStmtCacheSqlLimit=2048
     username: root
     password: Zzl20020929
     driver-class-name: com.mysql.cj.jdbc.Driver
     hikari:
-      minimum-idle: 10
-      maximum-pool-size: 50
-      idle-timeout: 30000
-      max-lifetime: 1800000
-      connection-timeout: 30000
+      pool-name: FlashSale-HikariCP
+      minimum-idle: 20           # 最小空闲连接（提高）
+      maximum-pool-size: 100     # 最大连接数（提高到CPU核数*12~15）
+      idle-timeout: 30000        # 空闲超时
+      max-lifetime: 1800000      # 最大生命周期
+      connection-timeout: 3000   # 获取连接超时（缩短）
+      validation-timeout: 2000   # 验证超时
+      leak-detection-threshold: 60000  # 连接泄漏检测
 
-  # Redis配置
+  # Redis配置（优化后）
   data:
     redis:
       host: localhost
       port: 6379
       database: 0
+      timeout: 3000              # 命令超时
+      connect-timeout: 2000      # 连接超时
       lettuce:
         pool:
-          max-active: 200
-          max-wait: -1
-          max-idle: 20
-          min-idle: 10
+          max-active: 500        # 最大活跃连接（大幅提高）
+          max-wait: 2000ms       # 获取连接最大等待时间
+          max-idle: 100          # 最大空闲连接
+          min-idle: 50           # 最小空闲连接
+          time-between-eviction-runs: 30s  # 空闲连接检测间隔
 
   # Kafka配置
   kafka:

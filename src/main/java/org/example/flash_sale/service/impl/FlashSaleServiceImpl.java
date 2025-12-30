@@ -16,6 +16,7 @@ import org.example.flash_sale.service.FlashSaleService;
 import org.example.flash_sale.service.ProductService;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.script.DefaultRedisScript;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -23,6 +24,7 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 
 /**
  * 秒杀服务实现
@@ -110,6 +112,29 @@ public class FlashSaleServiceImpl implements FlashSaleService {
 
         // 8. 返回成功响应
         return FlashSaleResponse.success(orderNo);
+    }
+
+    /**
+     * 异步秒杀（使用虚拟线程执行器）
+     * 释放Tomcat线程，提高并发处理能力
+     */
+    @Override
+    @Async("flashSaleExecutor")
+    public CompletableFuture<FlashSaleResponse> doFlashSaleAsync(Long userId, FlashSaleRequest request) {
+        log.debug("异步秒杀开始: userId={}, thread={}", userId, Thread.currentThread());
+        FlashSaleResponse response = doFlashSale(userId, request);
+        return CompletableFuture.completedFuture(response);
+    }
+
+    /**
+     * 异步直接数据库秒杀（使用虚拟线程执行器）
+     */
+    @Override
+    @Async("flashSaleExecutor")
+    public CompletableFuture<FlashSaleResponse> doFlashSaleDirectAsync(Long userId, FlashSaleRequest request) {
+        log.debug("异步直接秒杀开始: userId={}, thread={}", userId, Thread.currentThread());
+        FlashSaleResponse response = doFlashSaleDirect(userId, request);
+        return CompletableFuture.completedFuture(response);
     }
 
     @Override
