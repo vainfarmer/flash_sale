@@ -2,6 +2,30 @@
 
 一个基于 Spring Boot 3 + Redis + Kafka + MySQL 的高性能秒杀系统，能够应对高并发、低库存、短时间爆发式访问的场景。
 
+## 🌿 分支说明
+
+| 分支 | 说明 | 特性 |
+|------|------|------|
+| **master** | 基础版本 | 完整的秒杀功能（Redis + Lua + Kafka） |
+| **order-timeout** | 订单超时 | 新增 Redisson 延迟队列实现订单超时自动取消 |
+| **virtual** | 虚拟线程 | 新增 Java 21 虚拟线程支持 + 连接池优化 |
+
+### 分支差异对比
+
+```
+master
+  └── order-timeout（基于 master）
+        ├── + Redisson 延迟队列
+        ├── + 订单超时自动取消（30分钟）
+        ├── + 订单超时管理接口
+        └── + 定时任务监控
+              └── virtual（基于 order-timeout）
+                    ├── + Java 21 虚拟线程
+                    ├── + Tomcat 虚拟线程配置
+                    ├── + 优化连接池参数
+                    └── + 异步秒杀接口
+```
+
 ## 📐 系统架构
 
 ```
@@ -241,6 +265,169 @@ spring:
 2. 建议使用Nginx做负载均衡
 3. 建议开启Redis持久化
 4. 建议Kafka设置多副本
+
+---
+
+## 🌿 分支详细说明
+
+### 📌 master 分支
+
+基础版本，包含完整的秒杀核心功能：
+
+- Redis + Lua 脚本原子扣减库存
+- Kafka 异步订单处理
+- IP 限流 + JWT 身份验证
+- 乐观锁保证数据一致性
+
+### 📌 order-timeout 分支
+
+在 master 基础上新增**订单超时自动取消**功能：
+
+#### 新增功能
+
+| 功能 | 说明 |
+|------|------|
+| Redisson 延迟队列 | 订单创建后自动加入超时队列 |
+| 超时自动取消 | 30分钟未支付自动取消订单 |
+| 库存自动回滚 | 取消时回滚 Redis + MySQL 库存 |
+| 管理接口 | 查看/操作超时队列 |
+
+#### 配置项
+
+```yaml
+order:
+  timeout:
+    minutes: 30      # 超时时间（分钟）
+    enabled: true    # 是否启用
+```
+
+#### 新增文件
+
+```
++ service/OrderTimeoutService.java
++ service/impl/OrderTimeoutServiceImpl.java
++ controller/OrderTimeoutController.java
+```
+
+#### 管理接口
+
+| 接口 | 方法 | 说明 |
+|------|------|------|
+| `/api/admin/order-timeout/status` | GET | 查看队列状态 |
+| `/api/admin/order-timeout/add/{orderNo}` | POST | 手动加入队列 |
+| `/api/admin/order-timeout/remove/{orderNo}` | POST | 从队列移除 |
+| `/api/admin/order-timeout/process/{orderNo}` | POST | 手动处理超时 |
+
+### 📌 virtual 分支
+
+在 order-timeout 基础上新增**虚拟线程优化**（需要 Java 21+）：
+
+#### 新增功能
+
+| 功能 | 说明 |
+|------|------|
+| Tomcat 虚拟线程 | 请求处理使用虚拟线程 |
+| 异步秒杀接口 | 使用虚拟线程执行器 |
+| 连接池优化 | MySQL 100连接，Redis 500连接 |
+
+#### 配置变更
+
+```yaml
+spring:
+  threads:
+    virtual:
+      enabled: true    # 启用虚拟线程
+
+  datasource:
+    hikari:
+      maximum-pool-size: 100   # 提高数据库连接数
+
+  data:
+    redis:
+      lettuce:
+        pool:
+          max-active: 500      # 提高Redis连接数
+```
+
+#### 新增文件
+
+```
++ config/AsyncConfig.java      # 异步配置（虚拟线程执行器）
+```
+
+#### 新增接口
+
+| 接口 | 方法 | 说明 |
+|------|------|------|
+| `/api/flash/test/do-async` | POST | 异步秒杀（Redis方案） |
+| `/api/flash/test/do-direct-async` | POST | 异步秒杀（直接DB方案） |
+
+#### ⚠️ 虚拟线程注意事项
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                  虚拟线程适用场景                                     │
+├─────────────────────────────────────────────────────────────────────┤
+│   ✅ 适合使用虚拟线程：                                               │
+│      • Redis 操作（Lettuce 非阻塞）                                  │
+│      • Kafka 操作（异步发送）                                        │
+│      • HTTP 调用（网络IO等待）                                       │
+│                                                                     │
+│   ❌ 不适合使用虚拟线程：                                             │
+│      • 数据库操作（HikariCP/JDBC 有 synchronized）                   │
+│      • 会导致虚拟线程"钉住"(pinning)，造成线程饥饿                    │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+**解决方案**：数据库操作使用普通线程池 `taskExecutor`，而非虚拟线程。
+
+---
+
+## 🧪 压力测试
+
+### 测试脚本
+
+```bash
+cd scripts
+
+# 安装依赖
+pip install -r requirements.txt
+
+# 初始化测试数据
+mysql -u root -p flash_sale < init_users.sql
+```
+
+### 测试命令
+
+```bash
+# Redis + Lua + Kafka 方案（默认）
+python flash_sale_test.py --users 500 --concurrency 100 --mode redis
+
+# 直接数据库方案
+python flash_sale_test.py --users 500 --concurrency 100 --mode direct
+
+# 异步 Redis 方案（virtual分支）
+python flash_sale_test.py --users 500 --concurrency 200 --mode redis-async
+
+# 异步直接数据库方案（virtual分支）
+python flash_sale_test.py --users 500 --concurrency 200 --mode direct-async
+```
+
+### 重置测试数据
+
+```sql
+-- 重置商品库存
+UPDATE t_product SET available_stock = 100, version = 0 WHERE id = 1;
+
+-- 清除订单
+DELETE FROM t_order WHERE product_id = 1;
+```
+
+```bash
+# 清除Redis数据
+redis-cli DEL flash:bought:1
+redis-cli SET flash:stock:1 100
+```
 
 ## 📜 License
 
