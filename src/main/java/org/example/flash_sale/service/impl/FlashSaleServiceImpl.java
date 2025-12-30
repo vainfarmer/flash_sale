@@ -127,10 +127,13 @@ public class FlashSaleServiceImpl implements FlashSaleService {
     }
 
     /**
-     * 异步直接数据库秒杀（使用虚拟线程执行器）
+     * 异步直接数据库秒杀
+     * 注意：使用普通线程池而非虚拟线程！
+     * 原因：数据库操作涉及 HikariCP/JDBC 的 synchronized 块，
+     * 虚拟线程会被"钉住"(pinning)，导致载体线程饥饿
      */
     @Override
-    @Async("flashSaleExecutor")
+    @Async("taskExecutor") // 使用普通线程池，避免虚拟线程 pinning
     public CompletableFuture<FlashSaleResponse> doFlashSaleDirectAsync(Long userId, FlashSaleRequest request) {
         log.debug("异步直接秒杀开始: userId={}, thread={}", userId, Thread.currentThread());
         FlashSaleResponse response = doFlashSaleDirect(userId, request);

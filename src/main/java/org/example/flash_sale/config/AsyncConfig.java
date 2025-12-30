@@ -33,22 +33,25 @@ public class AsyncConfig implements AsyncConfigurer {
     }
 
     /**
-     * 通用异步任务执行器（平台线程池）
-     * 用于CPU密集型任务
+     * 数据库操作专用线程池（平台线程）
+     * 
+     * 重要：数据库操作不能使用虚拟线程！
+     * 原因：HikariCP、JDBC、Spring事务 内部使用 synchronized，
+     *       会导致虚拟线程"钉住"(pinning)载体线程，造成线程饥饿
      */
     @Bean("taskExecutor")
     public Executor taskExecutor() {
         ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
-        // 核心线程数 = CPU核数
-        int cpuCores = Runtime.getRuntime().availableProcessors();
-        executor.setCorePoolSize(cpuCores);
-        executor.setMaxPoolSize(cpuCores * 2);
-        executor.setQueueCapacity(1000);
-        executor.setThreadNamePrefix("async-task-");
+        // 线程数需要足够大以支持并发数据库操作
+        // 建议：核心线程数 >= 数据库连接池大小
+        executor.setCorePoolSize(100);   // 与 HikariCP max-pool-size 匹配
+        executor.setMaxPoolSize(200);    // 峰值处理能力
+        executor.setQueueCapacity(2000); // 队列容量
+        executor.setThreadNamePrefix("db-task-");
         executor.setKeepAliveSeconds(60);
         // 拒绝策略：由调用线程执行
         executor.setRejectedExecutionHandler((r, e) -> {
-            log.warn("任务队列已满，由调用线程执行");
+            log.warn("数据库任务队列已满，由调用线程执行");
             if (!e.isShutdown()) {
                 r.run();
             }
